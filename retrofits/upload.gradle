@@ -1,0 +1,42 @@
+apply plugin: 'maven-publish'
+def getRepositoryUsername() {
+    return "A3fFnUEe"
+}
+
+def getRepositoryPassword() {
+    return "zLe85E3K4atAPebK7DOGIw4PNt3oiFsL8IG7bwnCArS4"
+}
+
+uploadArchives {
+    repositories {
+
+        mavenDeployer {
+            // 这里远程仓库的地址需要改为实际要发布的地址
+            repository(url: "https://repo1.maven.org/maven2/") {
+                authentication(userName: getRepositoryUsername(), password: getRepositoryPassword())
+            }
+            snapshotRepository(url: "https://repo1.maven.org/maven2/snapshot") {
+                authentication(userName: getRepositoryUsername(), password: getRepositoryPassword())
+            }
+
+            pom.groupId = "com.retrofits.net"
+            pom.artifactId = "retrofit"
+            // 版本
+            def version = "1.9.9"
+
+            // 判断是否是release版本，非release版本自动在版本号后面加个SNAPSHOT
+            if (System.getenv('isRelease') && Boolean.valueOf(System.getenv('isRelease'))) {
+                pom.version = version
+            } else {
+                if (System.getenv('buildID')) {
+                    version = version + "." + System.getenv('buildID')
+                }
+                pom.version = version  + "-SNAPSHOT"
+
+            }
+
+        }
+    }
+}
+
+
