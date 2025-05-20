@@ -1,4 +1,5 @@
 一：发布错误
+1.
 Found tasks
 Tasks:
 
@@ -24,3 +25,21 @@ gradle 版本我是从gradle-4.10.1-all升级到了gradle-7.5-all.zip
 
 生成原因：gradle 目录下的gradle-wrapper，gradlew，gradlew.bat 不对
 其所对应的是版本是：gradle-4.10.1-all
+2.
+Subscription is not active right now
+Requested subscription: github.com/anunyieldingfighter.
+Your subscriptions are listed in https://jitpack.io/w/user
+Please contact Support or repository admins if you need assistance.
+
+生成原因：
+配置是从别的项目复制而来  忘记提交gradle文件夹下的wrapper
+
+二：使用依赖
+1. api 'com.github.AnUnyieldingFighter:networkaar:1.2'
+会下载2个依赖
+com.github.AnUnyieldingFighter.networkaar:retrofit:1.2
+com.github.AnUnyieldingFighter.networkaar:retrofit-debug:1.2
+
+2. api 'com.github.AnUnyieldingFighter.networkaar:retrofit:1.2'
+下载指定依赖
+ com.github.AnUnyieldingFighter.networkaar:retrofit:1.2
