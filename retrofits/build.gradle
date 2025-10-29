@@ -6,6 +6,7 @@ apply plugin: 'maven-publish'
 
 
 android {
+    namespace 'com.retrofits.net'
     compileSdkVersion rootProject.ext.compileSdkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     defaultConfig {
