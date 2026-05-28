@@ -87,24 +87,54 @@ public class UploadingManager extends BaseManager {
     public void request21(RequestBody requestBody, String fileName) {
         // 3. 包装成带进度的 RequestBody
         RequestBodyProUpload progressBody = new RequestBodyProUpload(requestBody, getProgress(), fileName);
-        request22(progressBody);
+        request22(progressBody, fileName);
     }
 
-    private void request22(RequestBodyProUpload progressBody) {
+    private void request22(RequestBodyProUpload progressBody, String other) {
         // 4. 丢给 Retrofit 上传
         BaseNetSource source = new BaseNetSource();
         source.setProgressType(1);
         Retrofit retrofit = source.getRetrofit(new UrlManger());
         UpApi service = retrofit.create(UpApi.class);
         Call<ResultObject<String>> call = service.uploadRB(progressBody);
-        call.enqueue(new RequestResultListener<ResultObject<String>>(this) {
+        call.enqueue(new RequestResultListener<ResultObject<String>>(this, other) {
             @Override
             public Object getObject(Response<ResultObject<String>> response) {
                 ResultObject<String> body = response.body();
                 String obj = body.getObj();
                 return obj;
             }
+
+            @Override
+            public void onResponse(Call<ResultObject<String>> call, Response<ResultObject<String>> response) {
+                super.onResponse(call, response);
+                if (response.isSuccessful()) {
+                    //完成
+                    //listener.onProgress(3, "成功", path, total, total);
+                } else {
+                    //服务器错误
+                    getProgress().onProgress(4, "", other, -1, -1);
+                }
+                getProgress();
+            }
+
+            @Override
+            public void onFailure(Call<ResultObject<String>> call, Throwable e) {
+                super.onFailure(call, e);
+                //错误 也会走这里
+                // call.cancel();   会走这里
+                //1：开始 2：进行中 3：完成 4：出错 5:停止下载
+                if ("Canceled".equals(e.getMessage()) || call.isCanceled()) {
+                    // ⭐ 取消
+                    getProgress().onProgress(5, "", other, -1, -1);
+                } else {
+                    // 其他失败
+                    getProgress().onProgress(4, "", other, -1, -1);
+
+                }
+            }
         });
+
     }
 
     //上传表单

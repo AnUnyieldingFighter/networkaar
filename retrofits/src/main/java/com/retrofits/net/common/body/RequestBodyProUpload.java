@@ -54,11 +54,16 @@ public class RequestBodyProUpload extends RequestBody {
         }
     }
 
+    //  标记是否已经回调过“开始上传”
+    private boolean hasStart = false;
 
+    //1：开始 2：进行中 3：完成 4：出错 5:停止下载
     @Override
     public void writeTo(BufferedSink sink) throws IOException {
-
-
+        if (!hasStart) {
+            hasStart = true;
+            listener.onProgress(1, "", upFilePath, 0, contentLength());
+        }
         // 2. 包装 Sink（关键！）
         Sink progressSink = new ForwardingUpload(sink);
         // 3. 包装成 BufferedSink 写入真实数据
