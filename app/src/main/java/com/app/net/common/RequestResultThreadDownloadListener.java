@@ -39,22 +39,10 @@ public class RequestResultThreadDownloadListener extends TaskResultThreadListene
         this.baseManager = baseManager;
     }
 
-    @Override
-    public void onRequestResult(Call<ResponseBody> call, Response<ResponseBody> response) {
-        onDownloadFile(response);
-    }
 
     public void setDownloadFile(String url, String filePath) {
         this.url = url;
         this.filePath = filePath;
-    }
-
-    //调用次方法 是为了设置isContinue
-    public void onDleFile() {
-        File file = new File(filePath + ".l");
-        if (file.exists()) {
-            file.delete();
-        }
     }
 
     //1正在下载 2:下载完成
@@ -65,7 +53,6 @@ public class RequestResultThreadDownloadListener extends TaskResultThreadListene
     public void onStopDownload(Call<ResponseBody> call) {
         onStop(call);
     }
-
     //停止下载文件
     @Override
     protected void onStop(Call<ResponseBody> call) {
@@ -87,6 +74,10 @@ public class RequestResultThreadDownloadListener extends TaskResultThreadListene
         Handler h = baseManager.getHandleCall();
         onBack(h, listener, 5, url, filePath, 0, 0);
 
+    }
+    @Override
+    public void onRequestResult(Call<ResponseBody> call, Response<ResponseBody> response) {
+        onDownloadFile(response);
     }
 
     //下载文件

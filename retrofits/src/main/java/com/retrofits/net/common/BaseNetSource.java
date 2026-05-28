@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.retrofits.net.common.body.ProgressResponseBody;
+import com.retrofits.net.common.body.ResponseBodyProDownload;
 import com.retrofits.net.common.custom.JacksonFactory;
 import com.retrofits.utiles.RLog;
 
@@ -36,10 +36,17 @@ public class BaseNetSource {
     protected OkHttpClient okHttpClient;
     //上传文件path
     protected String upFilePath;
+    //1 上传  2 下载
+    protected int upType;
 
-    public void setProgressListener(ProgressListener listener, String upFilePath) {
+    public void setProgressListener(int upType, ProgressListener listener, String upFilePath) {
+        this.upType = upType;
         this.listener = listener;
         this.upFilePath = upFilePath;
+    }
+
+    public void setProgressType(int upType) {
+        this.upType = upType;
     }
 
     public Retrofit getRetrofit(BaseUrl constraint) {
@@ -67,12 +74,31 @@ public class BaseNetSource {
     protected OkHttpClient getOkHttpClient(BaseUrl constraint) {
         if (okHttpClient == null) {
             OkHttpClient.Builder builder = new OkHttpClient.Builder();
-            builder.addInterceptor(new RequestHeader());
-            if (RLog.DBUG) {
-                builder.addInterceptor(new Network());
+            switch (upType) {
+                case 0:
+                    //添加请求头
+                    builder.addInterceptor(new RequestHeader());
+                    break;
+                case 1:
+                    //上传
+                    builder.addInterceptor(new RequestHeaderUpload());
+                    if (listener != null) {
+                        //上传 无效？
+                        builder.addInterceptor(new ProgressUpload());
+                    }
+                    break;
+                case 2:
+                    //下载
+                    builder.addInterceptor(new RequestHeaderUpload());
+                    if (listener != null) {
+                        builder.addInterceptor(new ProgressDownload());
+                    }
+                    break;
             }
-            if (listener != null) {
-                builder.addInterceptor(new Progress());
+
+            if (RLog.DBUG && upType == 0) {
+                //上传和下载 不要日志
+                builder.addInterceptor(new Network());
             }
             builder = setSSl(constraint, builder);
             setTimeOut(builder);
@@ -94,7 +120,7 @@ public class BaseNetSource {
         String url = constraint.getUrl();
         if (isSSl && url.startsWith("https")) {
             builder = new SSL().setSSL(builder, constraint.getContext(),
-                    constraint.getSSLCertificates(),constraint.getHostName());
+                    constraint.getSSLCertificates(), constraint.getHostName());
         }
         return builder;
     }
@@ -117,14 +143,43 @@ public class BaseNetSource {
         }
     }
 
-    //上传下载进度拦截
-    public class Progress implements Interceptor {
+    //上传用
+    public class RequestHeaderUpload implements Interceptor {
+
+        @Override
+        public Response intercept(Chain chain) throws IOException {
+            Request request = chain.request()
+                    .newBuilder()
+                    //绝对不要手动加 Content-Type！！
+                    //上传文件时，系统会自动生成：multipart/form-data
+                    .addHeader("Connection", "keep-alive")
+                    .addHeader("Accept", "*/*")
+                    .build();
+            return chain.proceed(request);
+        }
+    }
+
+    //上传进度拦截 无效？
+    public class ProgressUpload implements Interceptor {
 
         @Override
         public Response intercept(Chain chain) throws IOException {
             okhttp3.Response orginalResponse = chain.proceed(chain.request());
             Response response = orginalResponse.newBuilder()
-                    .body(new ProgressResponseBody(orginalResponse.body(), listener, upFilePath))
+                    .body(new ResponseBodyProDownload(orginalResponse.body(), listener, upFilePath))
+                    .build();
+            return response;
+        }
+    }
+
+    //下载进度拦截
+    public class ProgressDownload implements Interceptor {
+
+        @Override
+        public Response intercept(Chain chain) throws IOException {
+            okhttp3.Response orginalResponse = chain.proceed(chain.request());
+            Response response = orginalResponse.newBuilder()
+                    .body(new ResponseBodyProDownload(orginalResponse.body(), listener, upFilePath))
                     .build();
             return response;
         }
@@ -187,7 +242,6 @@ public class BaseNetSource {
                     + "\n请求：" + body
                     + "\n返回: " + res
                     + "\n响应时间：" + time + "毫秒");
-
             return response;
         }
     }

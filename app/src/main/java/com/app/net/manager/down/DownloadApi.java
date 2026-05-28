@@ -20,5 +20,9 @@ public interface DownloadApi {
     @GET
     Call<ResponseBody> download(@Url String fileUrl);
 
+
+    @GET
+    Call<ResponseBody> download2(@Url String url);
+
 }
 
