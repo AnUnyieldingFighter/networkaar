@@ -62,7 +62,7 @@ public class RequestBodyProUpload extends RequestBody {
     public void writeTo(BufferedSink sink) throws IOException {
         if (!hasStart) {
             hasStart = true;
-            listener.onProgress(1, "", upFilePath, 0, contentLength());
+            listener.onProgress(1, "", upFilePath, 0, contentLength(),"start");
         }
         // 2. 包装 Sink（关键！）
         Sink progressSink = new ForwardingUpload(sink);
@@ -88,10 +88,10 @@ public class RequestBodyProUpload extends RequestBody {
             bytesUploaded += byteCount;     // 统计
             if (bytesUploaded == totalLength) {
                 //上传完成
-                listener.onProgress(3, "", upFilePath, bytesUploaded, totalLength);// 回调进度
+                listener.onProgress(3, "", upFilePath, bytesUploaded, totalLength,"completed");// 回调进度
             } else
                 //上传中
-                listener.onProgress(2, "", upFilePath, bytesUploaded, totalLength);// 回调进度
+                listener.onProgress(2, "", upFilePath, bytesUploaded, totalLength,"pro");// 回调进度
         }
     }
 

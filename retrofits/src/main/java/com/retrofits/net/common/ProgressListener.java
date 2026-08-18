@@ -12,7 +12,8 @@ public interface ProgressListener {
      * @param filePath 本地保存的path或者上传时的文件path
      * @param progress 已经下载或上传字节数
      * @param total    总字节数
+     * @param msg      消息
      */
     void onProgress(int what, String url, String filePath,
-                    long progress, long total);
+                    long progress, long total, String msg);
 }

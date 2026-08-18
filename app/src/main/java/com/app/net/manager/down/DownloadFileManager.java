@@ -22,17 +22,13 @@ import retrofit2.Retrofit;
  */
 public class DownloadFileManager extends BaseManager {
 
-    private String fileUrl = "http://img-smarthos.hztywl.cn/EDU_COURSE_201908_mPn7ZJR_uqZKQ.pdf";
-    private String fialePath = "/storage/emulated/0/Download/test.pdf";
+
 
     public DownloadFileManager(RequestBack requestBack) {
         super(requestBack);
     }
 
-    public void setData(String fileUrl, String fialePath) {
-        this.fileUrl = fileUrl;
-        this.fialePath = fialePath;
-    }
+
 
     private RequestResultThreadDownloadListener listener;
 
@@ -40,32 +36,32 @@ public class DownloadFileManager extends BaseManager {
         if (listener == null) {
             return;
         }
-        listener.onStopDownload(call);
+        listener.onStopDownload();
     }
 
-    private Call<ResponseBody> call;
-
-    public void request() {
+    private String fileUrlTamp = "http://img-smarthos.hztywl.cn/EDU_COURSE_201908_mPn7ZJR_uqZKQ.pdf";
+    private String fialePathTamp = "/storage/emulated/0/Download/test.pdf";
+    public void request(String fileUrl,String fialePath) {
         BaseNetSource source = new BaseNetSource();
         Retrofit retrofit = source.getRetrofit(new UrlManger());
         DownloadApi service = retrofit.create(DownloadApi.class);
         //断点下载
         //Call<ResponseBody> call = service.download("bytes=" + 536 + "-", fileUrl);
         //下载
-        call = service.download(fileUrl);
+        Call<ResponseBody> call = service.download(fileUrl);
         listener = new RequestResultThreadDownloadListener(
                 this, call);
         listener.setDownloadFile(fileUrl, fialePath);
         listener.start();
     }
 
-    public void request2() {
+    public void request2(String fileUrl,String fialePath) {
         BaseNetSource source = new BaseNetSource();
         Retrofit retrofit = source.getRetrofit(new UrlManger());
         source.setProgressListener(2, getProgress(false), fialePath);
         DownloadApi service = retrofit.create(DownloadApi.class);
         //下载
-        call = service.download2(fileUrl);
+        Call<ResponseBody> call = service.download2(fileUrl);
         call.enqueue(new Callback<ResponseBody>() {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {

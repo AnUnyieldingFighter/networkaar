@@ -115,7 +115,10 @@ public class TestActivity extends Activity implements RequestBack, View.OnClickL
         if (downloadManager == null) {
             downloadManager = new DownloadFileManager(this);
         }
-        downloadManager.request();
+        String url = "https://nbc.vtnbo.com/nbc/msg/emoji-package/beta/17867587301967344.zip";
+        String path = FileUtile.getFileToPri(this, "zip");
+        Log.d("文件上传下载", "保存地址：" + path);
+        downloadManager.request(url, path);
     }
 
     private void testUploading() {
@@ -181,11 +184,12 @@ public class TestActivity extends Activity implements RequestBack, View.OnClickL
     }
 
     @Override
-    public void onBackProgress(int what, String url, String filePath, long currentLength, long totalLength) {
-        Log.d("文件上传下载：what" + what, "url：" + url + " filePath:" + filePath + " " +
-                "currentLength:" + currentLength + " totalLength:" + totalLength);
+    public void onBackProgress(int what, String url, String filePath, long currentLength, long totalLength, String msg) {
+        Log.d("文件上传下载：what " + what, "url：" + url + " filePath:" + filePath + " " +
+                "currentLength:" + currentLength + " totalLength:" + totalLength+" msg:"+msg);
         tvNum.setText(currentLength + "/" + totalLength);
     }
+
 
 
 }

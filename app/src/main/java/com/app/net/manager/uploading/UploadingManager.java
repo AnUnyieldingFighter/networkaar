@@ -79,15 +79,16 @@ public class UploadingManager extends BaseManager {
 
     //上传文件
     public void request21(File file) {
+        //MediaType.parse("video/mp4")
         RequestBody requestBody = RequestBody.create(MediaType.parse("image/jpeg"), file);
         request21(requestBody, file.getPath());
     }
 
     //上传文件
-    public void request21(RequestBody requestBody, String fileName) {
+    public void request21(RequestBody requestBody, String filePath) {
         // 3. 包装成带进度的 RequestBody
-        RequestBodyProUpload progressBody = new RequestBodyProUpload(requestBody, getProgress(), fileName);
-        request22(progressBody, fileName);
+        RequestBodyProUpload progressBody = new RequestBodyProUpload(requestBody, getProgress(), filePath);
+        request22(progressBody, filePath);
     }
 
     private void request22(RequestBodyProUpload progressBody, String other) {
@@ -113,7 +114,7 @@ public class UploadingManager extends BaseManager {
                     //listener.onProgress(3, "成功", path, total, total);
                 } else {
                     //服务器错误
-                    getProgress().onProgress(4, "", other, -1, -1);
+                    getProgress().onProgress(4, "", other, -1, -1,"Server Error");
                 }
                 getProgress();
             }
@@ -125,11 +126,11 @@ public class UploadingManager extends BaseManager {
                 // call.cancel();   会走这里
                 //1：开始 2：进行中 3：完成 4：出错 5:停止下载
                 if ("Canceled".equals(e.getMessage()) || call.isCanceled()) {
-                    // ⭐ 取消
-                    getProgress().onProgress(5, "", other, -1, -1);
+                    //  取消
+                    getProgress().onProgress(5, "", other, -1, -1,e.getMessage());
                 } else {
                     // 其他失败
-                    getProgress().onProgress(4, "", other, -1, -1);
+                    getProgress().onProgress(4, "", other, -1, -1,e.getMessage());
 
                 }
             }

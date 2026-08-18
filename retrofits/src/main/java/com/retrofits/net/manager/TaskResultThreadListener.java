@@ -18,7 +18,7 @@ public abstract class TaskResultThreadListener<T> implements Callback<T>, Runnab
 
     public String other;
     protected BaseManager baseManager;
-    private Call<T> call;
+    protected Call<T> call;
 
     public TaskResultThreadListener(Call<T> call) {
         this.call = call;
@@ -38,7 +38,7 @@ public abstract class TaskResultThreadListener<T> implements Callback<T>, Runnab
     public void setOther(String other) {
         this.other = other;
     }
-    protected void onStop(Call<T> call) {
+    protected void onStop() {
         if (call == null) {
             return;
         }

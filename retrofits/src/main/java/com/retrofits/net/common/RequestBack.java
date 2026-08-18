@@ -17,12 +17,12 @@ public interface RequestBack {
     /**
      * 进度
      *
-     * @param what          1：开始 2：进行中 3：完成 4：出错
+     * @param what          1：开始 2：进行中 3：完成 4：出错 5 停止
      * @param url           下载的url
      * @param filePath      本地保存的path或者上传时的文件path
      * @param currentLength 进度
      * @param totalLength   总大小
      */
     void onBackProgress(int what, String url, String filePath,
-                        long currentLength, long totalLength);
+                        long currentLength, long totalLength,String msg);
 }

@@ -1,6 +1,7 @@
 package com.app.net.common;
 
 import android.os.Handler;
+import android.telephony.SignalStrength;
 
 import com.retrofits.net.manager.BaseManager;
 import com.retrofits.net.manager.TaskResultThreadListener;
@@ -50,13 +51,14 @@ public class RequestResultThreadDownloadListener extends TaskResultThreadListene
     //true 停止下载
     private boolean isStop;
 
-    public void onStopDownload(Call<ResponseBody> call) {
-        onStop(call);
+    public void onStopDownload() {
+        onStop();
     }
+
     //停止下载文件
     @Override
-    protected void onStop(Call<ResponseBody> call) {
-        super.onStop(call);
+    protected void onStop() {
+        super.onStop();
         if (isStop) {
             return;
         }
@@ -72,13 +74,18 @@ public class RequestResultThreadDownloadListener extends TaskResultThreadListene
     private void onStopListener() {
         BaseManager.Progress listener = baseManager.getProgress();
         Handler h = baseManager.getHandleCall();
-        onBack(h, listener, 5, url, filePath, 0, 0);
+        //1：开始 2：进行中 3：完成 4：出错 5 停止
+        onBack(h, listener, 5, url, filePath, currentLength, totalLength, "stop");
 
     }
+
     @Override
     public void onRequestResult(Call<ResponseBody> call, Response<ResponseBody> response) {
         onDownloadFile(response);
     }
+
+    long currentLength = 0;
+    long totalLength = 0;
 
     //下载文件
     protected void onDownloadFile(Response<ResponseBody> response) {
@@ -86,14 +93,15 @@ public class RequestResultThreadDownloadListener extends TaskResultThreadListene
             return;
         }
         downloadType = 1;
-        long currentLength = 0;
+        currentLength = 0;
+        totalLength = 0;
         String path = filePath + ".l";
         File file = new File(path);
         InputStream is = response.body().byteStream(); //获取下载输入流
-        long totalLength = response.body().contentLength();
+        totalLength = response.body().contentLength();
         BaseManager.Progress listener = baseManager.getProgress(false);
         Handler h = baseManager.getHandleCall();
-        onBack(h, listener, 1, url, filePath, 0, totalLength);
+        onBack(h, listener, 1, url, filePath, 0, totalLength, "start");
 
         boolean isContinue = false;
         if (file.exists() && file.length() > 0) {
@@ -117,10 +125,10 @@ public class RequestResultThreadDownloadListener extends TaskResultThreadListene
                 if (currentLength == totalLength) {
                     //下载完成
                     file.renameTo(new File(filePath));
-                    onBack(h, listener, 3, url, filePath, currentLength, totalLength);
+                    onBack(h, listener, 3, url, filePath, currentLength, totalLength, "completed");
                 } else {
                     //计算当前下载百分比，并经由回调传出
-                    onBack(h, listener, 2, url, filePath, currentLength, totalLength);
+                    onBack(h, listener, 2, url, filePath, currentLength, totalLength, "pro");
                 }
             }
             os.close();
@@ -128,35 +136,18 @@ public class RequestResultThreadDownloadListener extends TaskResultThreadListene
         } catch (IOException e) {
             e.printStackTrace();
             is = null;
-            onBack(h, listener, 4, url, filePath, currentLength, totalLength);
+            onBack(h, listener, 4, url, filePath, currentLength, totalLength, e.getMessage());
 
         }
         downloadType = 2;
     }
 
-    private void onBack(Handler h, BaseManager.Progress listener, int what, String url, String filePath, long progress, long total) {
-        h.post(new Runnables(listener, what, url, filePath, progress, total));
-    }
-
-    class Runnables implements Runnable {
-        private BaseManager.Progress listener;
-        private int what;
-        private String url;
-        private String filePath;
-        private long progress, total;
-
-        private Runnables(BaseManager.Progress listener, int what, String url, String filePath, long progress, long total) {
-            this.listener = listener;
-            this.what = what;
-            this.url = url;
-            this.filePath = filePath;
-            this.progress = progress;
-            this.total = total;
+    private void onBack(Handler h, BaseManager.Progress listener, int what, String url, String filePath,
+                        long progress, long total, String msg) {
+        if (listener != null) {
+            listener.onProgress(what, url, filePath, progress, total, msg);
         }
 
-        @Override
-        public void run() {
-            listener.onProgress(what, url, filePath, progress, total);
-        }
     }
+
 }

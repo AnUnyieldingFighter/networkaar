@@ -103,10 +103,11 @@ public abstract class BaseManager {
                 long progress = bundle.getLong("progress", 0);
                 long total = bundle.getLong("total", 0);
                 boolean isOnBack = bundle.getBoolean("isOnBack", false);
+                hint = bundle.getString("msg");
                 if (!isOnBack) {
-                    requestBack.onBackProgress(whatCode, url, filePath, progress, total);
+                    requestBack.onBackProgress(whatCode, url, filePath, progress, total, hint);
                 } else {
-                    requestBack.onBack(WHAT_LOADING_PROGRESS, whatCode == 3, String.valueOf(progress), String.valueOf(total));
+                    requestBack.onBack(WHAT_LOADING_PROGRESS, whatCode == 3, progress + "_" + total, hint);
                 }
                 break;
         }
@@ -154,7 +155,7 @@ public abstract class BaseManager {
          * @param total    总字节数
          */
         @Override
-        public void onProgress(int what, String url, String filePath, long progress, long total) {
+        public void onProgress(int what, String url, String filePath, long progress, long total, String msg) {
             RLog.e("BaseManager", "进度：progress：" + progress + " total:" + total);
             Message message = handleCall.obtainMessage();
             message.what = -201;
@@ -165,6 +166,7 @@ public abstract class BaseManager {
             bundle.putLong("progress", progress);
             bundle.putLong("total", total);
             bundle.putBoolean("isOnBack", isOnBack);
+            bundle.putString("msg", msg);
             message.setData(bundle);
             handleCall.sendMessage(message);
         }

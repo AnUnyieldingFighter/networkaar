@@ -85,7 +85,7 @@ public class ResponseBodyProDownload extends ResponseBody {
 
             // 空安全，防止 null 崩溃
             if (listener != null) {
-                listener.onProgress(what, "", upFilePath, totalBytesRead, length);
+                listener.onProgress(what, "", upFilePath, totalBytesRead, length,"");
             }
             return bytesRead;
         }
