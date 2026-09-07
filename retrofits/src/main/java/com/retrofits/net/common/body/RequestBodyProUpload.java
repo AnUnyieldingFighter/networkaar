@@ -80,6 +80,8 @@ public class RequestBodyProUpload extends RequestBody {
     class ForwardingUpload extends ForwardingSink {
         private long bytesUploaded = 0; // 已上传
         private long totalLength = contentLength();       // 总长度
+        // 限制进度回调频率，避免大文件上传时向主线程发送过多消息。
+        private long lastProgressTime;
 
         public ForwardingUpload(Sink delegate) {
             super(delegate);
@@ -97,7 +99,12 @@ public class RequestBodyProUpload extends RequestBody {
             } else
                 //上传中
                 if (listener != null) {
-                    listener.onProgress(2, "", upFilePath, bytesUploaded, totalLength,"pro");// 回调进度
+                    long now = System.currentTimeMillis();
+                    if (now - lastProgressTime >= 100) {
+                        lastProgressTime = now;
+                        listener.onProgress(2, "", upFilePath,
+                                bytesUploaded, totalLength,"pro");// 回调进度
+                    }
                 }
         }
     }
