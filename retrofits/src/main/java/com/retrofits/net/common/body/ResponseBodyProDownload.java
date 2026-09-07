@@ -9,12 +9,9 @@ import okhttp3.MediaType;
 import okhttp3.ResponseBody;
 import okio.Buffer;
 import okio.BufferedSource;
-import okio.ForwardingSink;
 import okio.ForwardingSource;
 import okio.Okio;
-import okio.Sink;
 import okio.Source;
-import okio.Timeout;
 
 /**
  * 下载 需要进度指示时使用
@@ -24,20 +21,35 @@ import okio.Timeout;
 public class ResponseBodyProDownload extends ResponseBody {
     private final ResponseBody responseBody;
     private final ProgressListener listener;
-    //上传文件path
-    private String upFilePath;
-    private BufferedSource bufferedSource;
+    private final String url;
+    // 下载文件保存路径
+    private final String filePath;
+    // source 可能被不同线程访问，使用 volatile 保证安全发布。
+    private volatile BufferedSource bufferedSource;
 
     public ResponseBodyProDownload(ResponseBody responseBody, ProgressListener listener) {
+        if (responseBody == null) {
+            throw new NullPointerException("responseBody == null");
+        }
         this.responseBody = responseBody;
         this.listener = listener;
-        this.upFilePath = "";
+        this.url = "";
+        this.filePath = "";
     }
 
     public ResponseBodyProDownload(ResponseBody responseBody, ProgressListener listener, String upFilePath) {
+        this(responseBody, listener, "", upFilePath);
+    }
+
+    public ResponseBodyProDownload(ResponseBody responseBody, ProgressListener listener,
+                                   String url, String filePath) {
+        if (responseBody == null) {
+            throw new NullPointerException("responseBody == null");
+        }
         this.responseBody = responseBody;
         this.listener = listener;
-        this.upFilePath = upFilePath;
+        this.url = url;
+        this.filePath = filePath;
     }
 
     @Override
@@ -67,6 +79,7 @@ public class ResponseBodyProDownload extends ResponseBody {
     class Forwarding extends ForwardingSource {
         //已下载（已上传）字节
         private long totalBytesRead = 0L;
+        private long lastNotifyTime;
 
         public Forwarding(Source delegate) {
             super(delegate);
@@ -83,9 +96,19 @@ public class ResponseBodyProDownload extends ResponseBody {
             long length = responseBody.contentLength();
             int what = isDone ? 3 : 2;//下载完成/下载中
 
-            // 空安全，防止 null 崩溃
-            if (listener != null) {
-                listener.onProgress(what, "", upFilePath, totalBytesRead, length,"");
+            // 大文件每次读取都会进入这里，限制刷新频率以免主线程消息队列堆积。
+            long now = System.currentTimeMillis();
+            boolean shouldNotify = isDone
+                    || now - lastNotifyTime >= 100
+                    || (length >= 0 && totalBytesRead >= length);
+            if (listener != null && shouldNotify) {
+                lastNotifyTime = now;
+                try {
+                    listener.onProgress(what, url, filePath, totalBytesRead, length, "");
+                } catch (RuntimeException e) {
+                    // 业务层进度处理失败不能中断响应体读取。
+                    e.printStackTrace();
+                }
             }
             return bytesRead;
         }

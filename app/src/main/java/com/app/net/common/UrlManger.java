@@ -31,4 +31,10 @@ public class UrlManger extends BaseUrl{
     public boolean isSSL() {
         return true;
     }
+
+    @Override
+    public boolean isTrustAllCertificates() {
+        // 正式环境必须保持 false；只有受控测试环境排查证书问题时才改为 true。
+        return false;
+    }
 }

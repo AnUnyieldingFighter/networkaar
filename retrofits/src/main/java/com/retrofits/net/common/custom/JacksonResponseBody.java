@@ -24,9 +24,12 @@ public class JacksonResponseBody<T> implements Converter<ResponseBody, T> {
     @Override
     public T convert(ResponseBody value) throws IOException {
         if (isReturn) {
-            String str = value.string();
-            value.close();
-            return (T) str;
+            try {
+                return (T) value.string();
+            } finally {
+                // 无论字符串读取是否成功，都要关闭响应体释放连接。
+                value.close();
+            }
         }
         try {
             Reader r = value.charStream();

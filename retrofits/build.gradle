@@ -42,7 +42,25 @@ dependencies {
     api fileTree(dir: 'libs', include: ['*.jar'])
     //api 'com.squareup.retrofit2:converter-jackson:2.1.0'
     //api 'com.squareup.retrofit2:retrofit:2.3.0' //2
-    api 'com.squareup.retrofit2:converter-jackson:2.3.0' //包含 'com.squareup.retrofit2:retrofit:2.3.0
+    //api 'com.squareup.retrofit2:converter-jackson:2.3.0'
+    //包含
+    //converter-jackson:2.3.0
+    //├── retrofit:2.3.0
+    //│   └── okhttp:3.8.0
+    //│       └── okio:1.13.0
+    //└── jackson-databind:2.7.2
+    //    ├── jackson-core:2.7.2
+    //    └── jackson-annotations:2.7.0
+    api 'com.squareup.retrofit2:converter-jackson:2.12.0'
+    //包含
+    //converter-jackson:2.12.0
+    //├── retrofit:2.12.0
+    //│   ├── okhttp:4.12.0
+    //│   │   └── okio:3.6.0
+    //│   └── kotlin-stdlib
+    //└── jackson-databind:2.18.2
+    //    ├── jackson-core:2.18.2
+    //    └── jackson-annotations:2.18.2
 }
 afterEvaluate {
     publishing {

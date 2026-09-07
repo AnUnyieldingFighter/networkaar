@@ -5,6 +5,7 @@ import com.retrofits.net.common.ProgressListener;
 import com.retrofits.utiles.RLog;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.MediaType;
 import okhttp3.RequestBody;
@@ -55,14 +56,16 @@ public class RequestBodyProUpload extends RequestBody {
     }
 
     //  标记是否已经回调过“开始上传”
-    private boolean hasStart = false;
+    // 请求重试或并发写入时只发送一次“开始上传”事件。
+    private final AtomicBoolean hasStart = new AtomicBoolean(false);
 
     //1：开始 2：进行中 3：完成 4：出错 5:停止下载
     @Override
     public void writeTo(BufferedSink sink) throws IOException {
-        if (!hasStart) {
-            hasStart = true;
-            listener.onProgress(1, "", upFilePath, 0, contentLength(),"start");
+        if (hasStart.compareAndSet(false, true)) {
+            if (listener != null) {
+                listener.onProgress(1, "", upFilePath, 0, contentLength(),"start");
+            }
         }
         // 2. 包装 Sink（关键！）
         Sink progressSink = new ForwardingUpload(sink);
@@ -88,10 +91,14 @@ public class RequestBodyProUpload extends RequestBody {
             bytesUploaded += byteCount;     // 统计
             if (bytesUploaded == totalLength) {
                 //上传完成
-                listener.onProgress(3, "", upFilePath, bytesUploaded, totalLength,"completed");// 回调进度
+                if (listener != null) {
+                    listener.onProgress(3, "", upFilePath, bytesUploaded, totalLength,"completed");// 回调进度
+                }
             } else
                 //上传中
-                listener.onProgress(2, "", upFilePath, bytesUploaded, totalLength,"pro");// 回调进度
+                if (listener != null) {
+                    listener.onProgress(2, "", upFilePath, bytesUploaded, totalLength,"pro");// 回调进度
+                }
         }
     }
 

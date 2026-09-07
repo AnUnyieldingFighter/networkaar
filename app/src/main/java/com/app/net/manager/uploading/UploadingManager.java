@@ -152,8 +152,9 @@ public class UploadingManager extends BaseManager {
                 MultipartBody.Part.createFormData("file", file.getName(), progressBody);
         // 4. 丢给 Retrofit 上传
         BaseNetSource source = new BaseNetSource();
-        Retrofit retrofit = source.getRetrofit(new UrlManger());
         source.setProgressType(1);
+        // 必须先设置上传类型，再构建 Retrofit 客户端。
+        Retrofit retrofit = source.getRetrofit(new UrlManger());
         UpApi service = retrofit.create(UpApi.class);
         Call<ResultObject<String>> call = service.uploadMB(mBody);
         call.enqueue(new RequestResultListener<ResultObject<String>>(this) {
