@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.retrofits.net.common.body.RequestBodyProUpload;
 import com.retrofits.net.common.body.ResponseBodyProDownload;
 import com.retrofits.net.common.custom.JacksonFactory;
 import com.retrofits.utiles.RLog;
@@ -254,12 +255,12 @@ public class BaseNetSource {
         public Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
             RequestBody requestBody = request.body();
-            if (requestBody == null || requestBody instanceof com.retrofits.net.common.body.RequestBodyProUpload) {
+            if (requestBody == null || requestBody instanceof RequestBodyProUpload) {
                 return chain.proceed(request);
             }
             // 上传进度要统计请求体写入网络的字节数，不能包装服务器返回的响应体。
             Request progressRequest = request.newBuilder()
-                    .method(request.method(), new com.retrofits.net.common.body.RequestBodyProUpload(
+                    .method(request.method(), new RequestBodyProUpload(
                             requestBody, progressListener, filePath))
                     .build();
             return chain.proceed(progressRequest);

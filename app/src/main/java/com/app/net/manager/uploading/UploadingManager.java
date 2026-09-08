@@ -35,7 +35,7 @@ public class UploadingManager extends BaseManager {
     }
 
 
-    //上传文件
+    //上传文件 方式1：setProgressListener(1, getProgress(false), file.getName());
     public void request(File file) {
         RequestBody requestFile =
                 RequestBody.create(MediaType.parse("multipart/form-data"), file);
@@ -72,7 +72,7 @@ public class UploadingManager extends BaseManager {
     }
 
 
-    //上传文件
+    //上传文件（直接使用 RequestBodyProUpload 作为参数上传）
     public void request21(File file) {
         //MediaType.parse("video/mp4")
         RequestBody requestBody = RequestBody.create(MediaType.parse("image/jpeg"), file);
@@ -85,7 +85,7 @@ public class UploadingManager extends BaseManager {
         RequestBodyProUpload progressBody = new RequestBodyProUpload(requestBody, getProgress(), filePath);
         request22(progressBody, filePath);
     }
-
+    //上传文件 方式2： source.setProgressType(1); 但是没有设置监听，监听会走 RequestBodyProUpload
     private void request22(RequestBodyProUpload progressBody, String other) {
         // 4. 丢给 Retrofit 上传
         BaseNetSource source = new BaseNetSource();
