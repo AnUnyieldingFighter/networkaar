@@ -2,6 +2,7 @@ package com.retrofits.net.manager;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 
 import com.retrofits.net.common.ProgressListener;
@@ -31,7 +32,8 @@ public abstract class BaseManager {
      * 进度
      */
     public static final int WHAT_LOADING_PROGRESS = 299;
-    protected HandleCall handleCall = new HandleCall();
+    // 网络请求可能在子线程创建 Manager，Handler 固定绑定主线程，避免子线程没有 Looper 时闪退。
+    protected HandleCall handleCall = new HandleCall(Looper.getMainLooper());
     //使用方法 BaseNetSource.setProgressListener(progress);
 
 
@@ -117,6 +119,10 @@ public abstract class BaseManager {
 
 
     class HandleCall extends Handler {
+        HandleCall(Looper looper) {
+            super(looper);
+        }
+
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
