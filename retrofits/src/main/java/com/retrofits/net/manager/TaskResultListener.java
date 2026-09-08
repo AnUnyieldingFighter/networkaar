@@ -46,6 +46,7 @@ public abstract class TaskResultListener<T> implements Callback<T> {
         onRequestResult(call, response);
     }
 
+    //调用 call.cancel() 也会走这里
     @Override
     public void onFailure(Call<T> call, Throwable t) {
         String msg = t.toString();
@@ -66,9 +67,11 @@ public abstract class TaskResultListener<T> implements Callback<T> {
         if (msg.contains("Socket closed")) {
             m = "已断开连接";
         }
+        if (call.isCanceled()) {
+            m = "取消链接";
+        }
         baseManager.onBack(onDealFailed(WHAT_LOCALITY_NET_WORK_ERROR, ""), null, m, other, false);
     }
-
 
 
     public Object getObject(Response<T> response) {

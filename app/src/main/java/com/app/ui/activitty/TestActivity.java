@@ -126,8 +126,7 @@ public class TestActivity extends Activity implements RequestBack, View.OnClickL
             uploadingManager = new UploadingManager(this);
         }
         String path = "/storage/emulated/0/Download/test.pdf";
-        uploadingManager.setData(new File(path));
-        uploadingManager.request();
+        uploadingManager.request(new File(path));
     }
 
     //上传
@@ -186,10 +185,9 @@ public class TestActivity extends Activity implements RequestBack, View.OnClickL
     @Override
     public void onBackProgress(int what, String url, String filePath, long currentLength, long totalLength, String msg) {
         Log.d("文件上传下载：what " + what, "url：" + url + " filePath:" + filePath + " " +
-                "currentLength:" + currentLength + " totalLength:" + totalLength+" msg:"+msg);
+                "currentLength:" + currentLength + " totalLength:" + totalLength + " msg:" + msg);
         tvNum.setText(currentLength + "/" + totalLength);
     }
-
 
 
 }

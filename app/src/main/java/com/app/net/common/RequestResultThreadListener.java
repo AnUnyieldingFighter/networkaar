@@ -12,7 +12,7 @@ import retrofit2.Response;
 import static com.retrofits.net.manager.BaseManager.WHAT_DEAL_FAILED;
 import static com.retrofits.net.manager.BaseManager.WHAT_DEAL_SUCCEED;
 
-/**废弃
+/**普通请求 在子线程运行
  * Created by Administrator on 2017/6/14.
  */
 

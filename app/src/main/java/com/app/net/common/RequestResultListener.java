@@ -13,6 +13,7 @@ import static com.retrofits.net.manager.BaseManager.WHAT_DEAL_FAILED;
 import static com.retrofits.net.manager.BaseManager.WHAT_DEAL_SUCCEED;
 
 /**
+ * 它用于 call.enqueue() 时，网络请求本身已经异步执行，Android 中响应回调通常回到主线程
  * Created by Administrator on 2017/6/14.
  */
 

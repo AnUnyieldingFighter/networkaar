@@ -34,14 +34,9 @@ public class UploadingManager extends BaseManager {
 
     }
 
-    private File file;
 
-    public void setData(File file) {
-        this.file = file;
-    }
-
-
-    public void request() {
+    //上传文件
+    public void request(File file) {
         RequestBody requestFile =
                 RequestBody.create(MediaType.parse("multipart/form-data"), file);
         MultipartBody.Part body =
@@ -114,7 +109,7 @@ public class UploadingManager extends BaseManager {
                     //listener.onProgress(3, "成功", path, total, total);
                 } else {
                     //服务器错误
-                    getProgress().onProgress(4, "", other, -1, -1,"Server Error");
+                    getProgress().onProgress(4, "", other, -1, -1, "Server Error");
                 }
                 getProgress();
             }
@@ -127,10 +122,10 @@ public class UploadingManager extends BaseManager {
                 //1：开始 2：进行中 3：完成 4：出错 5:停止下载
                 if ("Canceled".equals(e.getMessage()) || call.isCanceled()) {
                     //  取消
-                    getProgress().onProgress(5, "", other, -1, -1,e.getMessage());
+                    getProgress().onProgress(5, "", other, -1, -1, e.getMessage());
                 } else {
                     // 其他失败
-                    getProgress().onProgress(4, "", other, -1, -1,e.getMessage());
+                    getProgress().onProgress(4, "", other, -1, -1, e.getMessage());
 
                 }
             }
@@ -138,32 +133,5 @@ public class UploadingManager extends BaseManager {
 
     }
 
-    //上传表单
-    public void request3() {
-        // 1. 你要上传的文件
-        File file = new File("路径/xxx.jpg");
-        // 2. 创建普通 RequestBody
-        RequestBody requestBody =
-                RequestBody.create(MediaType.parse("video/mp4"), file);
-        // 3. 包装成带进度的 RequestBody
-        RequestBodyProUpload progressBody = new RequestBodyProUpload(requestBody, getProgress(), file.getPath());
-        //表单上传 包装 progressBody
-        MultipartBody.Part mBody =
-                MultipartBody.Part.createFormData("file", file.getName(), progressBody);
-        // 4. 丢给 Retrofit 上传
-        BaseNetSource source = new BaseNetSource();
-        source.setProgressType(1);
-        // 必须先设置上传类型，再构建 Retrofit 客户端。
-        Retrofit retrofit = source.getRetrofit(new UrlManger());
-        UpApi service = retrofit.create(UpApi.class);
-        Call<ResultObject<String>> call = service.uploadMB(mBody);
-        call.enqueue(new RequestResultListener<ResultObject<String>>(this) {
-            @Override
-            public Object getObject(Response<ResultObject<String>> response) {
-                ResultObject<String> body = response.body();
-                String obj = body.getObj();
-                return obj;
-            }
-        });
-    }
+
 }

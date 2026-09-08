@@ -22,7 +22,7 @@ import retrofit2.Call;
 import retrofit2.Response;
 
 /**
- * 下载
+ * 下载 在子线程运行
  * Created by Administrator on 2017/6/14.
  */
 
