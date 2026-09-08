@@ -15,6 +15,16 @@ import okio.Source;
 /**
  * 下载响应体进度包装。
  * 外部调用方式不变，通过读取 ResponseBody 自动回调下载进度。
+ * 服务器
+ * ↓
+ * 原始 responseBody.source()
+ * ↓
+ * Forwarding.read()       统计每次读取的字节数
+ * ↓
+ * Okio.buffer()           提供缓冲读取能力
+ * ↓
+ * Retrofit或外部下载代码
+ * 下载：数据读进来，所以包装 Source
  * Created by 郭敏 on 2018/3/7 0007.
  */
 public class ResponseBodyProDownload extends ResponseBody {
@@ -46,7 +56,13 @@ public class ResponseBodyProDownload extends ResponseBody {
         this.listener = listener;
         this.url = url == null ? "" : url;
         this.filePath = filePath == null ? "" : filePath;
-        Source progressSource = new Forwarding(responseBody.source());
+        //是服务器返回的原始响应数据流。OkHttp 从这个 Source 中读取下载内容。
+        BufferedSource source = responseBody.source();
+        //在原始下载数据流外面加一层“进度统计包装”。
+        Source progressSource = new Forwarding(source);
+        //给进度数据流再套一层缓冲，转换成 BufferedSource。
+        //因为 ResponseBody.source() 方法要求返回的是：BufferedSource
+        //而 ForwardingSource 本身只是普通的：Source 所以需要使用：Okio.buffer(progressSource)
         this.bufferedSource = Okio.buffer(progressSource);
     }
 
@@ -76,8 +92,17 @@ public class ResponseBodyProDownload extends ResponseBody {
             super(delegate);
         }
 
+        /**
+         *
+         * @param sink      本次读取的数据要放入的缓冲区。
+         * @param byteCount 调用方本次最多希望读取多少字节。
+         * @return
+         * @throws IOException
+         */
         @Override
         public long read(Buffer sink, long byteCount) throws IOException {
+            //返回值：本次实际读取的字节数。
+            //返回 -1：数据已经全部读取完，也就是到达 EOF(EOF 是 End Of File，中文就是“文件或数据流结束”。)
             long bytesRead = super.read(sink, byteCount);
             if (bytesRead == -1) {
                 // 某些调用方可能在 EOF 后再次读取，完成状态只能发送一次。

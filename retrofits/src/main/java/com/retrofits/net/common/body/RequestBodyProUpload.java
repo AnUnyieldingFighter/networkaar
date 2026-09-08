@@ -15,9 +15,18 @@ import okio.Okio;
 import okio.Sink;
 
 /**
- * 上传请求体进度包装。
- * 外部调用方式不变，通过写入 RequestBody 自动回调上传进度。
- * 状态 3 表示请求体数据已经发送完成。
+ * 文件/Multipart/其他 RequestBody
+ *         ↓
+ * RequestBodyProUpload
+ *         ↓
+ * BufferedSink
+ *         ↓
+ * ForwardingUpload 统计字节
+ *         ↓
+ * OkHttp 下层 Sink
+ *         ↓
+ * 网络
+ * 上传：数据写出去，所以包装 Sink
  * Created by 郭敏 on 2018/3/7 0007.
  */
 public class RequestBodyProUpload extends RequestBody {
