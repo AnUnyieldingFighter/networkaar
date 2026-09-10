@@ -65,19 +65,19 @@ public class BaseNetSource {
 
     protected ProgressListener listener;
     protected OkHttpClient okHttpClient;
-    //上传文件path
+    //上传文件path 或者  下载文件 保存的地址
     protected String upFilePath;
     //1 上传  2 下载 0 普通请求
-    protected int upType;
+    protected int requestType;
 
     public void setProgressListener(int upType, ProgressListener listener, String upFilePath) {
-        this.upType = upType;
+        this.requestType = upType;
         this.listener = listener;
         this.upFilePath = upFilePath;
     }
 
     public void setProgressType(int upType) {
-        this.upType = upType;
+        this.requestType = upType;
     }
 
     public Retrofit getRetrofit(BaseUrl constraint) {
@@ -88,7 +88,7 @@ public class BaseNetSource {
         if (baseUrl == null || baseUrl.length() == 0) {
             throw new IllegalArgumentException("BaseUrl 地址不能为空");
         }
-        final int requestType = upType;
+        final int requestType = this.requestType;
         if (requestType < 0 || requestType > 2) {
             throw new IllegalArgumentException("不支持的网络请求类型: " + requestType);
         }
@@ -153,9 +153,7 @@ public class BaseNetSource {
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
                 .connectionPool(connectionPool)
                 .dispatcher(dispatcher);
-        final int requestType = upType;
-        final ProgressListener requestListener = listener;
-        final String requestFilePath = upFilePath;
+
         if (constraint.isReqTimeContinue()) {
             // 每个 Call 使用独立的监听器，完整统计排队、连接、发送和接收响应体的总用时。
             builder.eventListenerFactory(call -> new NetworkTimeListener());
@@ -164,16 +162,16 @@ public class BaseNetSource {
             //builder.addInterceptor(new Network());
         }
         //添加请求头
-        setReqHead(requestType, builder);
-        setResInterceptor(requestType, builder, requestListener, requestFilePath);
+        setReqHead(builder);
+        setResInterceptor(builder);
         builder = setSSl(constraint, builder);
-        setTimeOut(requestType, builder);
+        setTimeOut(builder);
         okHttpClient = builder.build();
         return okHttpClient;
     }
 
     //设置超时
-    protected void setTimeOut(int requestType, OkHttpClient.Builder builder) {
+    protected void setTimeOut(OkHttpClient.Builder builder) {
         if (requestType == 0) {
             //普通请求
             builder.connectTimeout(60, TimeUnit.SECONDS);
@@ -201,7 +199,7 @@ public class BaseNetSource {
     }
 
     //设置请求head
-    protected void setReqHead(int requestType, OkHttpClient.Builder builder) {
+    protected void setReqHead(OkHttpClient.Builder builder) {
         if (requestType == 0) {
             builder.addInterceptor(new RequestHeader());
         } else {
@@ -211,23 +209,22 @@ public class BaseNetSource {
     }
 
     //拦截 数据返回
-    protected void setResInterceptor(int requestType, OkHttpClient.Builder builder, ProgressListener
-            requestListener, String requestFilePath) {
+    protected void setResInterceptor(OkHttpClient.Builder builder) {
         //
         switch (requestType) {
             case 0:
                 break;
             case 1:
                 //上传
-                if (requestListener != null) {
+                if (listener != null) {
                     // 上传进度必须包装请求体，而不是响应体。
-                    builder.addInterceptor(new ProgressUpload(requestListener, requestFilePath));
+                    builder.addInterceptor(new ProgressUpload(listener, upFilePath));
                 }
                 break;
             case 2:
                 //下载
-                if (requestListener != null) {
-                    builder.addInterceptor(new ProgressDownload(requestListener, requestFilePath));
+                if (listener != null) {
+                    builder.addInterceptor(new ProgressDownload(listener, upFilePath));
                 }
                 break;
 
@@ -387,22 +384,25 @@ public class BaseNetSource {
 
         @Override
         public void callEnd(Call call) {
-            printTime(call, "完成", null);
+            printTime(call, startTimeNanos, "完成", null);
         }
 
         @Override
         public void callFailed(Call call, IOException ioe) {
-            printTime(call, "失败", ioe);
+            printTime(call, startTimeNanos, "失败", ioe);
         }
 
-        private void printTime(Call call, String result, IOException ioe) {
-            long timeMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTimeNanos);
-            String error = ioe == null ? "" : "\n失败原因：" + ioe;
-            RLog.e("网络请求完整用时", "\nurl：" + call.request().url()
-                    + "\n完整请求用时：" + timeMillis + "毫秒"
-                    + "\n请求结果：" + result
-                    + error);
-        }
+
+    }
+
+    //打印请求时间
+    protected void printTime(Call call, long startTimeNanos, String result, IOException ioe) {
+        long timeMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTimeNanos);
+        String error = ioe == null ? "" : "\n失败原因：" + ioe;
+        RLog.e("网络请求完整用时", "\nurl：" + call.request().url()
+                + "\n完整请求用时：" + timeMillis + "毫秒"
+                + "\n请求结果：" + result
+                + error);
     }
 
 }
