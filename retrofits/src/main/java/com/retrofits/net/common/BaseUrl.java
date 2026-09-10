@@ -35,4 +35,9 @@ public abstract class BaseUrl {
 
     //是否开启使用证书
     public abstract boolean isSSL();
+
+    //true 打印请求->返回数据用时
+    public boolean isReqTimeContinue() {
+        return false;
+    }
 }

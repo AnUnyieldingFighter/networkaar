@@ -14,7 +14,7 @@ public class NetSourceThreadPool {
 
     private ExecutorService executor;
 
-    private static final int MAX_NUM_POOL_SIZE = 3;
+    private static final int MAX_NUM_POOL_SIZE = 6;
 
     // 直接创建单例，避免多个线程第一次调用时生成多个线程池。
     private static final NetSourceThreadPool INSTANCE = new NetSourceThreadPool();

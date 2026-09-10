@@ -17,8 +17,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import okhttp3.Call;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
+import okhttp3.EventListener;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -35,6 +37,10 @@ import retrofit2.Retrofit;
  * Retrofit：建议复用
  * LoginApi：建议复用，但不复用影响很小
  * Call：不能复用，每次请求都要新建
+ * <p>
+ * 完整网络请求用时日志：
+ * RLog.DBUG = true;
+ * 从请求开始计时，到响应体读取完成、关闭或者请求失败时打印，普通请求、上传和下载都支持。
  */
 public class BaseNetSource {
     //现在普通接口缓存 Retrofit，所以connectionPool与dispatcher这两个共享对象主要继续服务于不同配置的普通客户端以及上传、
@@ -81,9 +87,6 @@ public class BaseNetSource {
         String baseUrl = constraint.getUrl();
         if (baseUrl == null || baseUrl.length() == 0) {
             throw new IllegalArgumentException("BaseUrl 地址不能为空");
-        }
-        if (!baseUrl.endsWith("/")) {
-            throw new IllegalArgumentException("BaseUrl 必须以 '/' 结尾: " + baseUrl);
         }
         final int requestType = upType;
         if (requestType < 0 || requestType > 2) {
@@ -153,45 +156,36 @@ public class BaseNetSource {
         final int requestType = upType;
         final ProgressListener requestListener = listener;
         final String requestFilePath = upFilePath;
-        switch (requestType) {
-            case 0:
-                //添加请求头
-                builder.addInterceptor(new RequestHeader());
-                break;
-            case 1:
-                //上传
-                builder.addInterceptor(new RequestHeaderUpload());
-                if (requestListener != null) {
-                    // 上传进度必须包装请求体，而不是响应体。
-                    builder.addInterceptor(new ProgressUpload(requestListener, requestFilePath));
-                }
-                break;
-            case 2:
-                //下载
-                builder.addInterceptor(new RequestHeaderUpload());
-                if (requestListener != null) {
-                    builder.addInterceptor(new ProgressDownload(requestListener, requestFilePath));
-                }
-                break;
-            default:
-                throw new IllegalArgumentException("不支持的网络请求类型: " + requestType);
+        if (constraint.isReqTimeContinue()) {
+            // 每个 Call 使用独立的监听器，完整统计排队、连接、发送和接收响应体的总用时。
+            builder.eventListenerFactory(call -> new NetworkTimeListener());
+            //
+            //调试日志只记录请求元数据，避免读取整个请求/响应体。
+            //builder.addInterceptor(new Network());
         }
-
-        if (RLog.DBUG && requestType == 0) {
-            // 调试日志只记录请求元数据，避免读取整个请求/响应体。
-            builder.addInterceptor(new Network());
-        }
+        //添加请求头
+        setReqHead(requestType, builder);
+        setResInterceptor(requestType, builder, requestListener, requestFilePath);
         builder = setSSl(constraint, builder);
-        setTimeOut(builder);
+        setTimeOut(requestType, builder);
         okHttpClient = builder.build();
         return okHttpClient;
     }
 
     //设置超时
-    protected void setTimeOut(OkHttpClient.Builder builder) {
-        builder.connectTimeout(60, TimeUnit.SECONDS);
-        builder.readTimeout(60, TimeUnit.SECONDS);
-        builder.writeTimeout(60, TimeUnit.SECONDS);
+    protected void setTimeOut(int requestType, OkHttpClient.Builder builder) {
+        if (requestType == 0) {
+            //普通请求
+            builder.connectTimeout(60, TimeUnit.SECONDS);
+            builder.readTimeout(60, TimeUnit.SECONDS);
+            builder.writeTimeout(60, TimeUnit.SECONDS);
+        } else {
+            builder.connectTimeout(2, TimeUnit.MINUTES);   // 连接超时
+            builder.readTimeout(10, TimeUnit.MINUTES);    // 读超时
+            builder.writeTimeout(10, TimeUnit.MINUTES);    // 写超时（上传核心）
+            //builder.retryOnConnectionFailure(true)         // 开启失败自动重试
+        }
+
     }
 
     //设置证书
@@ -206,8 +200,43 @@ public class BaseNetSource {
         return builder;
     }
 
-    //网络请求添加头部
-    public static class RequestHeader implements Interceptor {
+    //设置请求head
+    protected void setReqHead(int requestType, OkHttpClient.Builder builder) {
+        if (requestType == 0) {
+            builder.addInterceptor(new RequestHeader());
+        } else {
+            builder.addInterceptor(new RequestHeaderUpload());
+        }
+
+    }
+
+    //拦截 数据返回
+    protected void setResInterceptor(int requestType, OkHttpClient.Builder builder, ProgressListener
+            requestListener, String requestFilePath) {
+        //
+        switch (requestType) {
+            case 0:
+                break;
+            case 1:
+                //上传
+                if (requestListener != null) {
+                    // 上传进度必须包装请求体，而不是响应体。
+                    builder.addInterceptor(new ProgressUpload(requestListener, requestFilePath));
+                }
+                break;
+            case 2:
+                //下载
+                if (requestListener != null) {
+                    builder.addInterceptor(new ProgressDownload(requestListener, requestFilePath));
+                }
+                break;
+
+        }
+
+    }
+
+    //普通请求添加头部
+    public class RequestHeader implements Interceptor {
 
         @Override
         public Response intercept(Chain chain) throws IOException {
@@ -343,6 +372,36 @@ public class BaseNetSource {
                 result.append(name).append(": ").append(value).append("; ");
             }
             return result.toString();
+        }
+    }
+
+    // 统计一次 OkHttp Call 的完整生命周期，不读取或缓存请求体、响应体。
+    //统计请求生命周期、耗时、DNS、连接、字节数
+    public class NetworkTimeListener extends EventListener {
+        private long startTimeNanos;
+
+        @Override
+        public void callStart(Call call) {
+            startTimeNanos = System.nanoTime();
+        }
+
+        @Override
+        public void callEnd(Call call) {
+            printTime(call, "完成", null);
+        }
+
+        @Override
+        public void callFailed(Call call, IOException ioe) {
+            printTime(call, "失败", ioe);
+        }
+
+        private void printTime(Call call, String result, IOException ioe) {
+            long timeMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTimeNanos);
+            String error = ioe == null ? "" : "\n失败原因：" + ioe;
+            RLog.e("网络请求完整用时", "\n请求结果：" + result
+                    + "\nurl：" + call.request().url()
+                    + "\n完整请求用时：" + timeMillis + "毫秒"
+                    + error);
         }
     }
 
