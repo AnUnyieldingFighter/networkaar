@@ -398,9 +398,9 @@ public class BaseNetSource {
         private void printTime(Call call, String result, IOException ioe) {
             long timeMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTimeNanos);
             String error = ioe == null ? "" : "\n失败原因：" + ioe;
-            RLog.e("网络请求完整用时", "\n请求结果：" + result
-                    + "\nurl：" + call.request().url()
+            RLog.e("网络请求完整用时", "\nurl：" + call.request().url()
                     + "\n完整请求用时：" + timeMillis + "毫秒"
+                    + "\n请求结果：" + result
                     + error);
         }
     }
