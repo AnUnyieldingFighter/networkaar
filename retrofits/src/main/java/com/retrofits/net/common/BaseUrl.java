@@ -40,4 +40,9 @@ public abstract class BaseUrl {
     public boolean isReqTimeContinue() {
         return false;
     }
+
+    //true 普通请求的Retrofit会复用
+    public boolean isRetrofitCommon() {
+        return false;
+    }
 }

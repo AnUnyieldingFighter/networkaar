@@ -92,7 +92,7 @@ public class BaseNetSource {
         if (requestType < 0 || requestType > 2) {
             throw new IllegalArgumentException("不支持的网络请求类型: " + requestType);
         }
-        if (requestType == 0) {
+        if (requestType == 0 && constraint.isRetrofitCommon()) {
             List<Object> cacheKey = createCacheKey(constraint, baseUrl);
             synchronized (retrofitCache) {
                 Retrofit retrofit = retrofitCache.get(cacheKey);
