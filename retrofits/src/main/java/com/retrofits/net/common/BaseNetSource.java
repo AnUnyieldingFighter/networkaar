@@ -1,5 +1,11 @@
 package com.retrofits.net.common;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Build;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -10,12 +16,17 @@ import com.retrofits.net.common.custom.JacksonFactory;
 import com.retrofits.utiles.RLog;
 
 import java.io.IOException;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.Call;
 import okhttp3.ConnectionPool;
@@ -41,12 +52,21 @@ import retrofit2.Retrofit;
  * 完整网络请求用时日志：
  * RLog.DBUG = true;
  * 从请求开始计时，到响应体读取完成、关闭或者请求失败时打印，普通请求、上传和下载都支持。
+ * <p>
+ * 系统代理切换：通过 BaseUrl.getContext() 提供 Context，库内部自动监听代理变化。
+ * 切换 Wi-Fi 代理后，后续新建连接使用当前系统代理，无需重建 Retrofit 或 API 对象。
  */
 public class BaseNetSource {
     //现在普通接口缓存 Retrofit，所以connectionPool与dispatcher这两个共享对象主要继续服务于不同配置的普通客户端以及上传、
     //下载客户端。它们不是必须项，但保留后能统一管理底层连接和线程，开销也很小。
     // 连接池:每个任务可以使用不同的证书和进度配置，但底层连接与调度线程应统一复用。
-    private static final ConnectionPool connectionPool = new ConnectionPool();
+    // 代理变化时替换连接池；volatile 保证请求线程及时看到新池。
+    private static volatile ConnectionPool connectionPool = new ConnectionPool();
+    // 所有客户端共用动态选择器，避免缓存客户端一直使用创建时的旧系统代理选择器。
+    private static final ProxySelector systemProxySelector = new SystemProxySelector();
+    // 接收器使用 Application Context，整个进程只注册一次，不持有 Activity。
+    //证整个 App 进程只注册一次代理变化广播接收器
+    private static final AtomicBoolean proxyReceiverRegistered = new AtomicBoolean(false);
     //- 管理异步请求线程。
     //- 控制同时执行的请求数量。
     //- 控制同一主机的并发数量。
@@ -92,6 +112,7 @@ public class BaseNetSource {
         if (requestType < 0 || requestType > 2) {
             throw new IllegalArgumentException("不支持的网络请求类型: " + requestType);
         }
+        registerProxyChangeReceiver(constraint.getContext());
         if (requestType == 0 && constraint.isRetrofitCommon()) {
             List<Object> cacheKey = createCacheKey(constraint, baseUrl);
             synchronized (retrofitCache) {
@@ -112,7 +133,8 @@ public class BaseNetSource {
                 // Retrofit 要求 baseUrl 以 '/' 结尾，提前校验可避免运行时构建失败。
                 .baseUrl(baseUrl)
                 .addConverterFactory(getJsonMapper())
-                .client(getOkHttpClient(constraint))
+                // Retrofit 可以长期缓存，每次创建实际请求时检查是否需要切换连接池。
+                .callFactory(new ProxyCallFactory(getOkHttpClient(constraint)))
                 .build();
     }
 
@@ -125,6 +147,7 @@ public class BaseNetSource {
                 constraint.isTrustAllCertificates(),
                 immutableList(constraint.getSSLCertificates()),
                 immutableList(constraint.getHostName()),
+                constraint.isReqTimeContinue(),
                 RLog.DBUG));
     }
 
@@ -152,7 +175,8 @@ public class BaseNetSource {
         // 客户端保留本次任务的拦截器和 SSL 配置，同时共享连接池与调度线程。
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
                 .connectionPool(connectionPool)
-                .dispatcher(dispatcher);
+                .dispatcher(dispatcher)
+                .proxySelector(systemProxySelector);
 
         if (constraint.isReqTimeContinue()) {
             // 每个 Call 使用独立的监听器，完整统计排队、连接、发送和接收响应体的总用时。
@@ -169,6 +193,9 @@ public class BaseNetSource {
         okHttpClient = builder.build();
         return okHttpClient;
     }
+
+
+
 
     //设置超时
     protected void setTimeOut(OkHttpClient.Builder builder) {
@@ -403,6 +430,94 @@ public class BaseNetSource {
                 + "\n完整请求用时：" + timeMillis + "毫秒"
                 + "\n请求结果：" + result
                 + error);
+    }
+
+
+
+    protected static void registerProxyChangeReceiver(Context context) {
+        if (context == null) {
+            return;
+        }
+        Context appContext = context.getApplicationContext();
+        if (appContext == null || !proxyReceiverRegistered.compareAndSet(false, true)) {
+            return;
+        }
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                resetProxyConnections();
+            }
+        };
+        IntentFilter filter = new IntentFilter(android.net.Proxy.PROXY_CHANGE_ACTION);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                appContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                appContext.registerReceiver(receiver, filter);
+            }
+        } catch (RuntimeException e) {
+            // 注册失败允许下次创建客户端时重试，避免进程一直无法监听代理变化。
+            proxyReceiverRegistered.set(false);
+            throw e;
+        }
+    }
+
+    protected static void resetProxyConnections() {
+        ConnectionPool oldPool = connectionPool;
+        // 新请求只进入新池。旧请求结束后即使连接回到旧池，也不会再被新请求复用。
+        connectionPool = new ConnectionPool();
+        // 清理旧池中已空闲的连接；正在执行的请求继续完成，其连接之后由旧池自动回收。
+        oldPool.evictAll();
+    }
+    protected static class ProxyCallFactory implements Call.Factory {
+        private volatile OkHttpClient client;
+
+        ProxyCallFactory(OkHttpClient client) {
+            this.client = client;
+        }
+        //创建本次实际执行网络请求的 OkHttp Call，并确保它使用当前连接池
+        @Override
+        public Call newCall(Request request) {
+            OkHttpClient current = client;
+            ConnectionPool currentPool = connectionPool;
+            if (current.connectionPool() != currentPool) {
+                // 仅代理变化后的首次请求更新客户端，保留证书、超时、拦截器和调度线程配置。
+                current = current.newBuilder().connectionPool(currentPool).build();
+                client = current;
+            }
+            return current.newCall(request);
+        }
+    }
+    //已经复用的 OkHttpClient 在新建连接时，使用当前系统代理
+    protected static class SystemProxySelector extends ProxySelector {
+        //A 网络：获取当前系统选择器 → 选择 .63:8888
+        //B 网络：获取当前系统选择器 → 选择 .105:8888
+        //它每次被调用时，都重新获取系统当前的选择器：
+        @Override
+        public List<Proxy> select(URI uri) {
+            // 必须在选择路由时获取最新选择器，不能在构造客户端时保存旧实例。
+            ProxySelector current = ProxySelector.getDefault();
+            if (current == null || current == this) {
+                return Collections.singletonList(Proxy.NO_PROXY);
+            }
+            // 保留系统的 PAC、代理绕过规则及无代理配置。
+            return current.select(uri);
+        }
+        //把“代理连接失败”的通知转交给系统当前的代理选择器
+
+        /**
+         *
+         * @param uri     原本要访问的请求地址。
+         * @param address 连接失败的代理地址，例如 .63:8888。
+         * @param ioe     失败原因，例如连接超时、拒绝连接。
+         */
+        @Override
+        public void connectFailed(URI uri, SocketAddress address, IOException ioe) {
+            ProxySelector current = ProxySelector.getDefault();
+            if (current != null && current != this) {
+                current.connectFailed(uri, address, ioe);
+            }
+        }
     }
 
 }
